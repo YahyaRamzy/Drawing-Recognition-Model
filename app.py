@@ -2,6 +2,7 @@ import flask
 from flask import Flask,render_template,url_for,request
 import pickle
 import base64
+
 import numpy as np
 import cv2
 import tensorflow as tf
@@ -10,14 +11,15 @@ import tensorflow as tf
 init_Base64 = 21;
 
 #Our dictionary
-label_dict = {0:'Cat', 1:'Giraffe', 2:'Sheep', 3:'Bat', 4:'Octopus', 5:'Camel'}
+label_dict = {0:'airplane', 1:'apple', 2:'banana', 3:'bicycle', 4:'car', 5:'dog',6:'door',7:'ladder',8:'moon',9:'sheep',10:'table',11:'tree',12:'wheel'}
 
 
 #Initializing the Default Graph (prevent errors)
-graph = tf.get_default_graph()
+graph = tf.compat.v1.get_default_graph()
+
 
 # Use pickle to load in the pre-trained model.
-with open(f'model_cnn.pkl', 'rb') as f:
+with open(f'Drawing-Recognition-Model\model_cnnVGGCOMPLETE.pkl', 'rb') as f:
         model = pickle.load(f)
 
 #Initializing new Flask instance. Find the html template in "templates".
@@ -33,9 +35,7 @@ def home():
 #Second route : Use our model to make prediction - render the results page.
 @app.route('/predict', methods=['POST'])
 def predict():
-        global graph
-        with graph.as_default():
-            if request.method == 'POST':
+        
                     final_pred = None
                     #Preprocess the image : set the image to 28x28 shape
                     #Access the image
@@ -47,17 +47,28 @@ def predict():
                     image = np.asarray(bytearray(draw_decoded), dtype="uint8")
                     image = cv2.imdecode(image, cv2.IMREAD_GRAYSCALE)
                     #Resizing and reshaping to keep the ratio.
-                    resized = cv2.resize(image, (28,28), interpolation = cv2.INTER_AREA)
+                    resized_image = cv2.resize(image, (224, 224))
+                    # Convert the image to a 3-channel image
+                    if len(resized_image.shape) == 2:
+                                resized_image = np.stack([resized_image] * 3, axis=-1)
+                    elif resized_image.shape[-1] == 1:
+                                resized_image = np.concatenate([resized_image] * 3, axis=-1)
+
+                        # Expand the dimensions of the image to add the batch dimension
+                    input_image = np.expand_dims(resized_image, axis=0)
+                         
+                      
+                    resized = cv2.resize(image, (224,224), interpolation = cv2.INTER_AREA)
                     vect = np.asarray(resized, dtype="uint8")
-                    vect = vect.reshape(1, 1, 28, 28).astype('float32')
+                    vect = vect.reshape(1, 1, 224, 224).astype('float32')
                     #Launch prediction
-                    my_prediction = model.predict(vect)
+                    model.run_eagerly = True
+                    my_prediction = model.predict(input_image)
                     #Getting the index of the maximum prediction
                     index = np.argmax(my_prediction[0])
                     #Associating the index and its value within the dictionnary
                     final_pred = label_dict[index]
-
-        return render_template('results.html', prediction =final_pred)
+                    return render_template('results.html', prediction =final_pred)
 
 
 
@@ -71,8 +82,8 @@ def predict():
 	
 
 # if we deploy it on our local server then use this
-#if __name__ == '__main__':
-#	app.run(debug=True)
+if __name__ == '__main__':
+	app.run(debug=True)
 
 
 
