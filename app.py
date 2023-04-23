@@ -10,6 +10,18 @@ import tensorflow as tf
 #Initialize the useless part of the base64 encoded image.
 init_Base64 = 21;
 
+from googleapiclient.discovery import build
+
+def search_images(query):
+    service = build("customsearch", "v1", developerKey="AIzaSyAN5U1erM17INW3tAVADPJNKOLvmZR1byo")
+    res = service.cse().list(
+        q=query,
+        cx="d168d9d47855a4e51",
+        searchType='image',
+        num=10,
+    ).execute()
+    return res['items']
+
 #Our dictionary
 label_dict = {0:'airplane', 1:'apple', 2:'banana', 3:'bicycle', 4:'car', 5:'dog',6:'door',7:'ladder',8:'moon',9:'sheep',10:'table',11:'tree',12:'wheel'}
 
@@ -28,12 +40,15 @@ app = flask.Flask(__name__, template_folder='templates')
 #First route : Render the initial drawing template
 @app.route('/')
 def home():
+	return render_template('home.html')
+
+@app.route('/vgg16')
+def vgg():
 	return render_template('draw.html')
 
 
-
 #Second route : Use our model to make prediction - render the results page.
-@app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['POST', 'GET'])
 def predict():
         
                     final_pred = None
@@ -65,10 +80,13 @@ def predict():
                     model.run_eagerly = True
                     my_prediction = model.predict(input_image)
                     #Getting the index of the maximum prediction
+                    print(my_prediction)
                     index = np.argmax(my_prediction[0])
                     #Associating the index and its value within the dictionnary
                     final_pred = label_dict[index]
-                    return render_template('results.html', prediction =final_pred)
+                    query = final_pred
+                    results = search_images(query)
+                    return render_template('results.html', results =results)
 
 
 
