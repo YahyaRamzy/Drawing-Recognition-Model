@@ -23,13 +23,15 @@ def search_images(query):
     return res['items']
 
 #Our dictionary
-label_dict = {0:'airplane', 1:'apple', 2:'banana', 3:'bicycle', 4:'car', 5:'dog',6:'door',7:'ladder',8:'moon',9:'sheep',10:'table',11:'tree',12:'wheel'}
+label_dict = {0:'airplane flying', 1:'apple fruit', 2:'banana fruit', 3:'bicycle', 4:'car', 5:'dog',6:'door',7:'ladder',8:'moon',9:'sheep animal',10:'table',11:'tree',12:'wheel'}
 
 
 #Initializing the Default Graph (prevent errors)
 graph = tf.compat.v1.get_default_graph()
 
-
+# Use pickle to load in the pre-trained model.
+with open(f'Drawing-Recognition-Model\model_CNN1.pkl', 'rb') as f:
+        modelCNN = pickle.load(f)
 # Use pickle to load in the pre-trained model.
 with open(f'Drawing-Recognition-Model\model_cnnVGGCOMPLETE.pkl', 'rb') as f:
         modelVGG = pickle.load(f)
@@ -37,7 +39,10 @@ with open(f'Drawing-Recognition-Model\model_cnnVGGCOMPLETE.pkl', 'rb') as f:
 # Use pickle to load in the pre-trained model.
 with open(f'Drawing-Recognition-Model\model_resnet50commp.pkl', 'rb') as f:
         modelResnet = pickle.load(f)
-
+        
+# Use pickle to load in the pre-trained model.
+with open(f'Drawing-Recognition-Model\model_incep.pkl', 'rb') as f:
+        modelIncep = pickle.load(f)
 
 #Initializing new Flask instance. Find the html template in "templates".
 app = flask.Flask(__name__, template_folder='templates')
@@ -54,8 +59,12 @@ def vgg():
 @app.route('/resnet')
 def resnet():
 	return render_template('drawresnet.html')
-
-
+@app.route('/cnn')
+def cnn():
+	return render_template('drawcnn.html')
+@app.route('/incep')
+def incep():
+	return render_template('drawincep.html')
 #Second route : Use our model to make prediction - render the results page.
 @app.route('/predictvgg', methods=['POST', 'GET'])
 def predictvgg():
@@ -138,6 +147,90 @@ def predictresnet():
                     results = search_images(query)
                     return render_template('results.html', results =results)
 
+@app.route('/predictincep', methods=['POST', 'GET'])
+def predictincep():
+        
+                    final_pred = None
+                    #Preprocess the image : set the image to 28x28 shape
+                    #Access the image
+                    draw = request.form['url']
+                    #Removing the useless part of the url.
+                    draw = draw[init_Base64:]
+                    #Decoding
+                    draw_decoded = base64.b64decode(draw)
+                    image = np.asarray(bytearray(draw_decoded), dtype="uint8")
+                    image = cv2.imdecode(image, cv2.IMREAD_GRAYSCALE)
+                    #Resizing and reshaping to keep the ratio.
+                    resized_image = cv2.resize(image, (224, 224))
+                    resized_image = resized_image / 255.0
+                    # Convert the image to a 3-channel image
+                    if len(resized_image.shape) == 2:
+                                resized_image = np.stack([resized_image] * 3, axis=-1)
+                    elif resized_image.shape[-1] == 1:
+                                resized_image = np.concatenate([resized_image] * 3, axis=-1)
+
+                        # Expand the dimensions of the image to add the batch dimension
+                    input_image = np.expand_dims(resized_image, axis=0)
+                         
+                      
+                    resized = cv2.resize(image, (224,224), interpolation = cv2.INTER_AREA)
+                    vect = np.asarray(resized, dtype="uint8")
+                    vect = vect.reshape(1, 1, 224, 224).astype('float32')
+                    #Launch prediction
+                    modelIncep.run_eagerly = True
+                    print(input_image)
+                    my_prediction = modelIncep.predict(input_image)
+                    #Getting the index of the maximum prediction
+                    print(my_prediction)
+                    index = np.argmax(my_prediction[0])
+                    #Associating the index and its value within the dictionnary
+                    final_pred = label_dict[index]
+                    query = final_pred
+                    results = search_images(query)
+                    return render_template('results.html', results =results)
+
+
+@app.route('/predictcnn', methods=['POST', 'GET'])
+def predictcnn():
+        
+                    final_pred = None
+                    #Preprocess the image : set the image to 28x28 shape
+                    #Access the image
+                    draw = request.form['url']
+                    #Removing the useless part of the url.
+                    draw = draw[init_Base64:]
+                    #Decoding
+                    draw_decoded = base64.b64decode(draw)
+                    image = np.asarray(bytearray(draw_decoded), dtype="uint8")
+                    image = cv2.imdecode(image, cv2.IMREAD_GRAYSCALE)
+                    #Resizing and reshaping to keep the ratio.
+                    resized_image = cv2.resize(image, (224, 224))
+                    resized_image = resized_image / 255.0
+                    # Convert the image to a 3-channel image
+                    if len(resized_image.shape) == 2:
+                                resized_image = np.stack([resized_image] * 3, axis=-1)
+                    elif resized_image.shape[-1] == 1:
+                                resized_image = np.concatenate([resized_image] * 3, axis=-1)
+
+                        # Expand the dimensions of the image to add the batch dimension
+                    input_image = np.expand_dims(resized_image, axis=0)
+                         
+                      
+                    resized = cv2.resize(image, (224,224), interpolation = cv2.INTER_AREA)
+                    vect = np.asarray(resized, dtype="uint8")
+                    vect = vect.reshape(1, 1, 224, 224).astype('float32')
+                    #Launch prediction
+                    modelCNN.run_eagerly = True
+                    print(input_image)
+                    my_prediction = modelCNN.predict(input_image)
+                    #Getting the index of the maximum prediction
+                    print(my_prediction)
+                    index = np.argmax(my_prediction[0])
+                    #Associating the index and its value within the dictionnary
+                    final_pred = label_dict[index]
+                    query = final_pred
+                    results = search_images(query)
+                    return render_template('results.html', results =results)
 
 
 
